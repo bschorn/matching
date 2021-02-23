@@ -34,9 +34,9 @@ import java.util.function.Consumer;
 
 /**
  * This data structure is not thread-safe. It is assumed that a
- * single Engine (with a single thread) will access the OrderBook.
+ * single Engine (using a single thread) will access the OrderBook.
  *
- * 1 Product -> 1 Engine -> 1 OrderBook
+ * 1 Product -> 1 OrderBook
  *
  * This is not an 'ideal' OrderBook as it's single purpose is to service
  * the Engine and is not designed for publishing OrderBook data.
@@ -45,14 +45,30 @@ import java.util.function.Consumer;
  */
 public class OrderBook {
 
-    static final private Comparator<Double> SORT_BUYS = (a, b) -> a == 0.0 || b == 0.0 ? Double.compare(a, b) : Double.compare(b, a);
+    private final Product product;
+
+    /**
+     * Keep all the buys sorted by price highest to lowest.
+     */
+    static final private Comparator<Double> SORT_BUYS = (a, b) -> Double.compare(b, a);
+    /**
+     * Keep all the sells sorted by price lowest to highest
+     */
     static final private Comparator<Double> SORT_SELLS = (a, b) -> Double.compare(a, b);
 
-    private final Product product;
+    /**
+     * The buys are kept in FIFO queues by price and the queues are sorted by price (highest to lowest)
+     */
     private final TreeMap<Double, Deque<Order>> buys = new TreeMap<>(SORT_BUYS);
+    /**
+     * The sells are kept in FIFO queues by price and the queues are sorted by price (lowest to highest)
+     */
     private final TreeMap<Double, Deque<Order>> sells = new TreeMap<>(SORT_SELLS);
 
-    // reusable list
+    /**
+     * When the engine requests for orders they are delivered by List which is recycled for each call.
+     * ** So there can only be ONE thread per OrderBook (and Product) **
+     */
     private final List<Order> takeList = new ArrayList<>();
 
     /**
@@ -64,10 +80,21 @@ public class OrderBook {
         this.product = product;
     }
 
+    /**
+     * Product of the OrderBook
+     *
+     * @return
+     */
     public Product product() {
         return this.product;
     }
 
+    /**
+     * If an order is unable to be fully matched upon entry into the Engine it will be
+     * accept(ed) by the OrderBook and placed at the end of its price's queue.
+     *
+     * @param order
+     */
     void accept(Order order) {
         if (order.side() == Side.BUY) {
             Deque<Order> q = this.buys.get(order.price());
@@ -86,6 +113,19 @@ public class OrderBook {
         }
     }
 
+    /**
+     * The engine will process all orders first before inserting into
+     * the OrderBook. The engine will submit a take request to the
+     * OrderBook by Side for a quantity and price (0 for market orders).
+     *
+     * The engine will send a take request for the other side of the
+     * order.
+     *
+     * @param side
+     * @param quantity
+     * @param price
+     * @return
+     */
     List<Order> take(Side side, int quantity, double price) {
         if (side == Side.BUY) {
             return takeBuy(quantity, price);
@@ -94,6 +134,15 @@ public class OrderBook {
         }
     }
 
+    /**
+     * The takeSell method searches the sells in price order
+     * (lowest to highest) with fifo ordering within price
+     * buckets.
+     *
+     * @param takeQty
+     * @param takePrice
+     * @return
+     */
     private List<Order> takeSell(int takeQty, double takePrice) {
         takeList.clear();
         for (Double price : this.sells.keySet()) {
@@ -114,6 +163,15 @@ public class OrderBook {
         return takeList;
     }
 
+    /**
+     * The takeSell method searches the buys in price order
+     * (highest to lowest) with fifo ordering within price
+     * buckets.
+     *
+     * @param takeQty
+     * @param takePrice
+     * @return
+     */
     private List<Order> takeBuy(int takeQty, double takePrice) {
         takeList.clear();
         for (Double price : this.buys.keySet()) {
@@ -134,6 +192,13 @@ public class OrderBook {
         return takeList;
     }
 
+    /**
+     * Dumps the OrderBook
+     *
+     * TODO: needs to be tested.
+     *
+     * @return
+     */
     @Override
     public String toString() {
         int sellSize = this.sells.keySet().size();

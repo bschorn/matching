@@ -43,18 +43,18 @@ import java.util.stream.Collectors;
 /**
  * Matching Engine
  *
- * An instance is dedicated to a single Product and keeps it's own
- * OrderBook instance for that Product's orders.
+ * An instance is dedicated to a collection of Product(s) and keeps an
+ * OrderBook instance for each Product's orders.
  */
 public class Engine implements Consumer<Order>, Callable<List<OrderBook>> {
     static private final Logger LGR = LoggerFactory.getLogger(Engine.class);
 
-    // add-in validation interface
+    // add-in rules interface
     public interface Rule extends Predicate<Order> {
         boolean test(Order order);
         String getReason(Order order);
     }
-    // validations
+    // engine rules
     private final List<Rule> rules = new ArrayList<>();
 
     // inbound queue
@@ -78,12 +78,23 @@ public class Engine implements Consumer<Order>, Callable<List<OrderBook>> {
         }
         executorService = Executors.newSingleThreadExecutor();
     }
-    // add validation
+
+    /**
+     * Add Engine Rule
+     *
+     * @param rule
+     * @return
+     */
     public boolean addRule(Rule rule) {
         return this.rules.add(rule);
     }
 
-    // remove validation
+    /**
+     * Remove Engine Rule
+     *
+     * @param rule
+     * @return
+     */
     public boolean removeRule(Rule rule) {
         return this.rules.remove(rule);
     }
@@ -131,7 +142,13 @@ public class Engine implements Consumer<Order>, Callable<List<OrderBook>> {
         return this.orderBookMap.values().stream().collect(Collectors.toList());
     }
 
-    // pre-order check
+    /**
+     * Pre-Trade Check all incoming Order(s) must run through all Engine.Rule(s)
+     * where they may be rejected and sent to the rejected queue.
+     *
+     * @param order
+     * @return
+     */
     private boolean passedRules(Order order) {
         for (Rule rule : this.rules) {
             if (!rule.test(order)) {
@@ -147,6 +164,9 @@ public class Engine implements Consumer<Order>, Callable<List<OrderBook>> {
 
     /**
      * Market Order Execution
+     *
+     * Take the quantity from the other side of the OrderBook.
+     *
      *
      * @param takeOrder
      */
@@ -183,6 +203,9 @@ public class Engine implements Consumer<Order>, Callable<List<OrderBook>> {
     /**
      * Limit Order Execution
      *
+     * Take the quantity from the other side of the OrderBook but only if
+     * the price is equal or better than the limit price.
+     *
      * @param takeOrder
      */
     private void limit(Order takeOrder) {
@@ -215,7 +238,7 @@ public class Engine implements Consumer<Order>, Callable<List<OrderBook>> {
 
     private final Supplier<Trade> tradeSupplier = () -> this.outboundTradeQueue.poll();
     /**
-     * Trade Drain
+     * Trade Supplier
      *
      * @return
      */
@@ -225,7 +248,7 @@ public class Engine implements Consumer<Order>, Callable<List<OrderBook>> {
 
     private final Supplier<Order.Rejected> rejectSupplier = () -> this.outboundRejectedQueue.poll();
     /**
-     * Trade Drain
+     * Rejected Order Supplier
      *
      * @return
      */

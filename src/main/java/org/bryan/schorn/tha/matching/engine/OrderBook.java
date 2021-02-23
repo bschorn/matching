@@ -57,11 +57,11 @@ public class OrderBook {
     static final private Comparator<Double> SORT_SELLS = (a, b) -> Double.compare(a, b);
 
     /**
-     * The buys are kept in FIFO queues by price and the queues are sorted by price (highest to lowest)
+     * The buys are organized by price (highest to lowest). The orders for each price are kept in FIFO queues by age.
      */
     private final TreeMap<Double, Deque<Order>> buys = new TreeMap<>(SORT_BUYS);
     /**
-     * The sells are kept in FIFO queues by price and the queues are sorted by price (lowest to highest)
+     * The buys are organized by price (lowest to highest). The orders for each price are kept in FIFO queues by age.
      */
     private final TreeMap<Double, Deque<Order>> sells = new TreeMap<>(SORT_SELLS);
 

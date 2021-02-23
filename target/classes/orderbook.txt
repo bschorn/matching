@@ -1,6 +1,0 @@
-symbol,price,buys,sells
-TSLA,780.38,0,1
-TSLA,779.70,0,1
-
-TSLA,779.70,0,1
-FB,266.80,0,1

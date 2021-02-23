@@ -7,3 +7,5 @@
 #### Configuration: src/main/resources/application.properties
 #### Input-Files: symbols.csv orders1.csv
 #### Output-Files: trades.txt rejected.txt orderbook.txt
+
+![Diagram](matching-engine.png)

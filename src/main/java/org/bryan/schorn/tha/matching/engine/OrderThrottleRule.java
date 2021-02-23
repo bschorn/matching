@@ -34,15 +34,23 @@ import java.util.TreeSet;
 
 
 /**
+ *  An Engine Rule with the intent of limiting (by symbol) a specified number of orders
+ *  allowed within a specified duration of time (in milliseconds).
  *
  */
 public class OrderThrottleRule implements Engine.Rule {
 
+    /**
+     * Pre-defined Engine.Rule for limiting 3 orders per 1 second window.
+     */
     static public OrderThrottleRule MAX_THREE_PER_SECOND = new OrderThrottleRule(3,1000);
 
 
+    // how many orders?
     int frequency;
+    // for how long?
     long durationMS;
+    // what is the descriptive reason be for rule returning false?
     String reason;
     public OrderThrottleRule(int frequency, long durationMS) {
         this.frequency = frequency;
@@ -50,6 +58,11 @@ public class OrderThrottleRule implements Engine.Rule {
         this.reason = String.format("order throttled: %d per %d ms window", this.frequency, this.durationMS);
     }
 
+    /**
+     * Last N orders where N == OrderThrottleRule.frequency of parent instance.
+     * tracks the timestamp of the last N orders. Once N orders have been collected,
+     * new orders are checked if they occurred within the the time limit.
+     */
     class LastN {
         TreeSet<Long> orderTimes = new TreeSet<>();
         boolean check(Long orderTime) {
@@ -65,6 +78,7 @@ public class OrderThrottleRule implements Engine.Rule {
         }
     }
 
+    // collection map by product
     private Map<Product,LastN> monitor = new HashMap<>();
 
     @Override

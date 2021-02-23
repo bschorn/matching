@@ -1,0 +1,6 @@
+symbol,is_halted
+AMZN,false
+AAPL,false
+GOOG,true
+TSLA,false
+FB,true

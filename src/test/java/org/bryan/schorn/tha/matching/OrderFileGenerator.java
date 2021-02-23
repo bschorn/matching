@@ -200,7 +200,7 @@ public class OrderFileGenerator {
     static public void create(String filename, int count) {
         try {
             OrderFileGenerator ofg = new OrderFileGenerator(0.75);
-            ofg.addParticipant("AMZN",3239.0, 3249.0);
+            ofg.addParticipant("AMZN",3239.0, 3242.0);
             ofg.addParticipant("AAPL",130.0, 134.0);
             ofg.addParticipant("GOOG",2114.0, 2120.0);
             ofg.addParticipant("TSLA",775.0, 781.0);

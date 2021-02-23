@@ -93,10 +93,10 @@ public class MEService implements Runnable {
         // create single engine with all products
         this.engine = new Engine(Products.findAll());
 
-        // add rule for the 3 orders in one second
-        this.engine.addRule(OrderThrottleRule.MAX_THREE_PER_SECOND);
         // add rule for trade halts
         this.engine.addRule(ProductHalted.PRODUCTED_HALTED);
+        // add rule for the 3 orders in one second
+        this.engine.addRule(OrderThrottleRule.MAX_THREE_PER_SECOND);
 
         // update state
         this.state = State.START;

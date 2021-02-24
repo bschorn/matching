@@ -76,6 +76,10 @@ public class Product {
             this.isHalted = Boolean.valueOf(isHalted);
             return this;
         }
+        public Builder setHalted(boolean isHalted) {
+            this.isHalted = isHalted;
+            return this;
+        }
         public Product build() throws Exception {
             if (this.exceptions.isEmpty()) {
                 return new Product(this);

@@ -1,3 +1,7 @@
+org\bryan\schorn\tha\matching\MatchingTests$Symbol.class
+org\bryan\schorn\tha\matching\TestOrderCreate.class
 org\bryan\schorn\tha\matching\OrderFileGenerator$PriceRange.class
 org\bryan\schorn\tha\matching\OrderFileGenerator.class
 org\bryan\schorn\tha\matching\MatchingTests.class
+org\bryan\schorn\tha\matching\TestOrderFeed.class
+org\bryan\schorn\tha\matching\MatchingTests$Scenario.class

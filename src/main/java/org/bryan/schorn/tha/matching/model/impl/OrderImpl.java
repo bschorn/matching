@@ -114,7 +114,7 @@ public class OrderImpl implements Order {
      */
     static public class BuilderImpl implements Order.Builder {
         static final DateTimeFormatter SEND_TIME_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd-HH:mm:ss.S");
-        private LocalDateTime sendTime;
+        private LocalDateTime sendTime = LocalDateTime.now();
         private String senderId;
         private String targetId;
         private String clOrdId;
@@ -125,6 +125,7 @@ public class OrderImpl implements Order {
         private int orderQty;
         List<Exception> exceptions = new ArrayList<>();
 
+        @Override
         public Order.Builder setSendTime(String sendTime) {
             try {
                 this.sendTime = LocalDateTime.from(SEND_TIME_FORMAT.parse(sendTime));
@@ -133,18 +134,27 @@ public class OrderImpl implements Order {
             }
             return this;
         }
+        @Override
+        public Order.Builder setSendTime(LocalDateTime sendTime) {
+            this.sendTime = sendTime;
+            return this;
+        }
+        @Override
         public Order.Builder setSenderId(String senderId) {
             this.senderId = senderId;
             return this;
         }
+        @Override
         public Order.Builder setTargetId(String targetId) {
             this.targetId = targetId;
             return this;
         }
+        @Override
         public Order.Builder setClOrdId(String clOrdId) {
             this.clOrdId = clOrdId;
             return this;
         }
+        @Override
         public Order.Builder setSymbol(String symbol) {
             try {
                 this.product = Products.find(symbol);
@@ -156,6 +166,12 @@ public class OrderImpl implements Order {
             }
             return this;
         }
+        @Override
+        public Order.Builder setProduct(Product product) {
+            this.product = product;
+            return this;
+        }
+        @Override
         public Order.Builder setSide(String side) {
             try {
                 this.side = Side.valueOf(side);
@@ -164,6 +180,12 @@ public class OrderImpl implements Order {
             }
             return this;
         }
+        @Override
+        public Order.Builder setSide(Side side) {
+            this.side = side;
+            return this;
+        }
+        @Override
         public Order.Builder setOrderType(String orderType) {
             try {
                 this.orderType = OrderType.valueOf(orderType);
@@ -172,6 +194,12 @@ public class OrderImpl implements Order {
             }
             return this;
         }
+        @Override
+        public Order.Builder setOrderType(OrderType orderType) {
+            this.orderType = orderType;
+            return this;
+        }
+        @Override
         public Order.Builder setPrice(String price) {
             try {
                 this.price = Double.valueOf(price);
@@ -180,6 +208,12 @@ public class OrderImpl implements Order {
             }
             return this;
         }
+        @Override
+        public Order.Builder setPrice(double price) {
+            this.price = price;
+            return this;
+        }
+        @Override
         public Order.Builder setOrderQty(String orderQty) {
             try {
                 this.orderQty = Integer.valueOf(orderQty);
@@ -188,7 +222,18 @@ public class OrderImpl implements Order {
             }
             return this;
         }
+        @Override
+        public Order.Builder setOrderQty(int orderQty) {
+            if (orderQty > 0) {
+                this.orderQty = orderQty;
+            } else {
+                this.exceptions.add(new Order.FieldException("order_qty", String.valueOf(orderQty),
+                        new Exception("OrderQty can not be zero or below")));
+            }
+            return this;
+        }
 
+        @Override
         public Order build() throws Exception {
             if (this.orderType == OrderType.MARKET) {
                 this.price = 0.0;
@@ -200,10 +245,12 @@ public class OrderImpl implements Order {
                     this.exceptions.size()));
         }
 
+        @Override
         public boolean hasExceptions() {
             return !this.exceptions.isEmpty();
         }
 
+        @Override
         public List<Exception> getExceptions() {
             return this.exceptions;
         }
@@ -219,6 +266,8 @@ public class OrderImpl implements Order {
             this.order = order;
             this.reason = reason;
         }
+        @Override
+        public Order order() { return this.order; }
 
         @Override
         public Product product() {

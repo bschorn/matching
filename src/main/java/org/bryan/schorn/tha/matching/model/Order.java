@@ -76,14 +76,20 @@ public interface Order {
      */
     interface Builder {
         Builder setSendTime(String sendTime);
+        Builder setSendTime(LocalDateTime sendTime);
         Builder setSenderId(String senderId);
         Builder setTargetId(String targetId);
         Builder setClOrdId(String clOrdId);
         Builder setSymbol(String symbol);
+        Builder setProduct(Product product);
         Builder setSide(String side);
+        Builder setSide(Side side);
         Builder setOrderType(String orderType);
+        Builder setOrderType(OrderType orderType);
         Builder setPrice(String price);
+        Builder setPrice(double price);
         Builder setOrderQty(String orderQty);
+        Builder setOrderQty(int orderQty);
 
         Order build() throws Exception;
 
@@ -104,6 +110,7 @@ public interface Order {
      */
     interface Rejected extends Order {
         String reason();
+        Order order();
     }
 
     /**

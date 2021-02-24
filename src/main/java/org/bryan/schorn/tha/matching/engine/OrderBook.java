@@ -220,4 +220,12 @@ public class OrderBook {
         joiner.add("");
         return joiner.toString();
     }
+
+    /**
+     * Cleans out the OrderBook
+     */
+    public void recycle() {
+        this.buys.clear();
+        this.sells.clear();
+    }
 }

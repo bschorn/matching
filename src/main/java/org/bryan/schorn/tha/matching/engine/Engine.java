@@ -53,6 +53,7 @@ public class Engine implements Consumer<Order>, Callable<List<OrderBook>> {
     public interface Rule extends Predicate<Order> {
         boolean test(Order order);
         String getReason(Order order);
+        String ruleDescription();
     }
     // engine rules
     private final List<Rule> rules = new ArrayList<>();
@@ -72,7 +73,7 @@ public class Engine implements Consumer<Order>, Callable<List<OrderBook>> {
     private Future<List<OrderBook>> future = null;
 
     // ctor
-    public Engine(List<Product> products) {
+    public Engine(Collection<Product> products) {
         for (Product product : products) {
             this.orderBookMap.put(product, new OrderBook(product));
         }
@@ -86,7 +87,9 @@ public class Engine implements Consumer<Order>, Callable<List<OrderBook>> {
      * @return
      */
     public boolean addRule(Rule rule) {
-        return this.rules.add(rule);
+        boolean added = this.rules.add(rule);
+        if (added) LGR.info("Rule added: "+rule.ruleDescription());
+        return added;
     }
 
     /**
@@ -96,7 +99,9 @@ public class Engine implements Consumer<Order>, Callable<List<OrderBook>> {
      * @return
      */
     public boolean removeRule(Rule rule) {
-        return this.rules.remove(rule);
+        boolean removed = this.rules.remove(rule);
+        if (removed) LGR.info("Rule removed: "+rule.ruleDescription());
+        return removed;
     }
 
     // incoming order place on inbound order queue
@@ -111,6 +116,15 @@ public class Engine implements Consumer<Order>, Callable<List<OrderBook>> {
     public void stopLoop() {
         this.keepLooping = false;
         executorService.shutdown();
+    }
+    // clear out
+    public void recycle() {
+        this.outboundRejectedQueue.clear();
+        this.inboundOrderQueue.clear();
+        this.outboundTradeQueue.clear();
+        for (OrderBook orderBook : this.orderBookMap.values()) {
+            orderBook.recycle();
+        }
     }
     // retrieves the last state the order books
     public List<OrderBook> getOrderBooks() throws Exception {

@@ -49,4 +49,9 @@ public class ProductHalted implements Engine.Rule {
     public String getReason(Order order) {
         return "product-halted";
     }
+
+    @Override
+    public String ruleDescription() {
+        return "Reject orders for products that have been halted.";
+    }
 }

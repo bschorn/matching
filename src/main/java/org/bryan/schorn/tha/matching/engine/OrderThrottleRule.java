@@ -52,10 +52,14 @@ public class OrderThrottleRule implements Engine.Rule {
     long durationMS;
     // what is the descriptive reason be for rule returning false?
     String reason;
+    // what is the rule for
+    String description;
     public OrderThrottleRule(int frequency, long durationMS) {
         this.frequency = frequency;
         this.durationMS = durationMS;
         this.reason = String.format("order throttled: %d per %d ms window", this.frequency, this.durationMS);
+        this.description = String.format("Reject orders that come into the engine faster than %d per %d ms",
+                this.frequency, this.durationMS);
     }
 
     /**
@@ -95,4 +99,7 @@ public class OrderThrottleRule implements Engine.Rule {
     public String getReason(Order order) {
         return this.reason;
     }
+
+    @Override
+    public String ruleDescription() { return this.description; }
 }

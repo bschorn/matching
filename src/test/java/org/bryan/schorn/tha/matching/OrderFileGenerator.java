@@ -33,6 +33,9 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
+/**
+ * Utility to generate simulated orders for MockOrderFeed
+ */
 public class OrderFileGenerator {
 
     static final String TARGET_ID = "THA";

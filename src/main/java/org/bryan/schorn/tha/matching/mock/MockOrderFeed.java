@@ -27,59 +27,95 @@ package org.bryan.schorn.tha.matching.mock;
 
 import org.bryan.schorn.tha.matching.model.Order;
 import org.bryan.schorn.tha.matching.order.OrderFeed;
-import org.bryan.schorn.tha.matching.order.OrderParser;
+import org.bryan.schorn.tha.matching.util.ClassLocator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.BufferedWriter;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardOpenOption;
 import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
 
 /**
- * Order Reader (from file)
+ * Mock Order Feed (from file)
  */
 public class MockOrderFeed extends OrderFeed.AbstractOrderFeed {
 
     static private final Logger LGR = LoggerFactory.getLogger(MockOrderFeed.class);
 
+    /**
+     * Mock Order Parser Interface
+     */
+    interface MockOrderParser extends OrderFeed.Parser<String> {
+        @Override
+        Order apply(String line);
+    }
+
+    /**
+     * Members
+     */
     private Properties properties;
     private Queue<Order> queue = new ConcurrentLinkedQueue<>();
     private List<Exception> exceptions = new ArrayList<>();
+    private MockOrderParser parser = null;
+    private Path orderFilePath = null;
 
+    /**
+     * Config
+     * @param properties
+     * @throws Exception
+     */
     @Override
-    public void setProperties(Properties properties) {
+    public void setProperties(Properties properties) throws Exception {
         this.properties = properties;
+        ClassLocator classLocator = ClassLocator.create(properties);
+        this.parser = (MockOrderParser) classLocator.newInstance(MockOrderParser.class.getSimpleName());
+        this.parser.setHeader(properties.getProperty("OrderFileHeader"));
     }
 
+    /**
+     * Connect
+     *
+     *
+     *
+     * @throws Exception
+     */
     @Override
     public void connect() throws Exception {
-        MockOrderFeedParser parser = new MockOrderFeedParser();
-        String orderFile = this.properties.getProperty("Order.File");
-        String rejectedFile = this.properties.getProperty("Rejected.File");
-        Path path = Paths.get(orderFile);
-        Predicate<String> skipHeader = (s) -> !s.startsWith("send_time");
-        Predicate<Order> skipNulls = (o) -> o != null;
-        Files.lines(path)
-                .filter(skipHeader)
-                .map(parser)
-                .filter(skipNulls)
-                .forEachOrdered(o -> queue.add(o));
-
-        if (parser.hasExceptions()) {
-            Path rejectedPath = Paths.get(rejectedFile);
-            try (BufferedWriter writer = Files.newBufferedWriter(rejectedPath, StandardCharsets.UTF_8, StandardOpenOption.CREATE)) {
-                for (OrderParser.OrderParseException ope : parser.getExceptions()) {
-                    writer.write(String.format("%s,%s", ope.inputLine(), ope.rootException().getMessage()));
-                }
-            }
+        String orderFile = this.properties.getProperty("OrderFile");
+        if (orderFile == null) {
+            throw new Exception(String.format("There was no file order file specified.\n"
+                    +"Please specify the order file in application.properties:\n"
+                    +"Order.File=<filepath>\n"));
+        }
+        this.orderFilePath = Paths.get(orderFile);
+        if (!Files.exists(this.orderFilePath)) {
+            throw new Exception(String.format("%s file not found: %s",
+                    MockOrderFeed.class.getSimpleName(),
+                    orderFile));
         }
     }
+
+    @Override
+    public Integer call() throws Exception {
+        final AtomicInteger records = new AtomicInteger(0);
+        Predicate<String> skipHeader = (s) -> !s.startsWith("symbol");
+        Predicate<Order> skipNulls = (o) -> o != null;
+        Files.lines(this.orderFilePath)
+                .filter(skipHeader)
+                .map(this.parser)
+                .filter(skipNulls)
+                .forEachOrdered(o -> {
+                    records.incrementAndGet();
+                    queue.add(o);
+                });
+        // return the count of records read
+        return records.get();
+    }
+
 
     /**
      * Get next Order (Supplier interface)
@@ -90,5 +126,6 @@ public class MockOrderFeed extends OrderFeed.AbstractOrderFeed {
     public Order get() {
         return this.queue.poll();
     }
+
 
 }

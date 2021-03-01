@@ -29,18 +29,20 @@ import org.bryan.schorn.tha.matching.model.Order;
 import org.bryan.schorn.tha.matching.util.ClassLocator;
 
 import java.util.Properties;
+import java.util.concurrent.Callable;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 /**
  * Order Feed Interface
  */
-public interface OrderFeed extends Supplier<Order> {
+public interface OrderFeed extends Supplier<Order>, Callable<Integer> {
     @Override
-    public Order get();
+    Order get();
 
-    public void connect() throws Exception;
+    void connect() throws Exception;
 
-    static public OrderFeed create(Properties properties) throws Exception {
+    static OrderFeed create(Properties properties) throws Exception {
         ClassLocator classLocator = ClassLocator.create(properties);
         AbstractOrderFeed orderFeed = (AbstractOrderFeed) classLocator.newInstance(OrderFeed.class.getSimpleName());
         orderFeed.setProperties(properties);
@@ -48,6 +50,17 @@ public interface OrderFeed extends Supplier<Order> {
     }
 
     abstract class AbstractOrderFeed implements OrderFeed {
-        protected abstract void setProperties(Properties properties);
+        protected abstract void setProperties(Properties properties) throws Exception;
+    }
+
+    /**
+     * OrderFeed.Parser Interface
+     * @param <T>
+     */
+    interface Parser<T> extends Function<T, Order> {
+        @Override
+        Order apply(T t);
+
+        void setHeader(String header);
     }
 }

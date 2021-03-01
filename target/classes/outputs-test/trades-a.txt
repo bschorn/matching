@@ -1,0 +1,2 @@
+symbol,price,timestamp
+AMZN,3171.87,1614586827.853778500

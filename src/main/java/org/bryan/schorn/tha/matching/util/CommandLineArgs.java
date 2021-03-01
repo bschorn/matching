@@ -40,7 +40,7 @@ public class CommandLineArgs {
     static public CommandLineArgs create(String[] args) {
         return new CommandLineArgs(args);
     }
-    static public String APPLICATION_PROPERTIES = "/application.properties";
+    static public String APPLICATION_PROPERTIES = "application.properties";
 
     private final Properties properties = new Properties();
     private final Map<String, Object> propertiesMap = new HashMap<>();
@@ -76,7 +76,10 @@ public class CommandLineArgs {
             this.properties.setProperty(paramName, paramValue);
         }
         try {
-            InputStream inputStream = CommandLineArgs.class.getResourceAsStream(APPLICATION_PROPERTIES);
+            String applicationProperties = this.properties.getProperty("properties-file");
+            applicationProperties = applicationProperties == null ? APPLICATION_PROPERTIES : applicationProperties;
+            // if you are getting a null for inputStream, check that the path starts with '/'
+            InputStream inputStream = CommandLineArgs.class.getResourceAsStream(applicationProperties);
             this.properties.load(inputStream);
         } catch (Exception ex) {
             LGR.error(ToString.stackTrace(ex));

@@ -34,17 +34,10 @@ public interface ProductParser extends Function<String, Product> {
 
 
     /**
-     * Were there any exceptions?
-     *
-     * @return
-     */
-    public boolean hasExceptions();
-
-    /**
      * List of all the exceptions (one for each line that had exception).
      * @return
      */
-    public List<ProductParseException> getExceptions();
+    List<ProductParseException> getExceptions();
 
 
     /**

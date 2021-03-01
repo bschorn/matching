@@ -56,7 +56,7 @@ public class MockProductFeed extends ProductFeed.AbstractProductFeed {
     @Override
     public void connect() throws Exception {
         ProductParser parser = new MockProductFeedParser();
-        String productFile = this.properties.getProperty("Product.File");
+        String productFile = this.properties.getProperty("ProductFile");
         Path path = Paths.get(productFile);
         Predicate<String> skipHeader = (s) -> !s.startsWith("symbol");
         Predicate<Product> skipNulls = (o) -> o != null;

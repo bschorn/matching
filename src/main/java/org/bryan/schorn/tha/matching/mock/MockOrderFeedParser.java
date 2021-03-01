@@ -26,32 +26,34 @@
 package org.bryan.schorn.tha.matching.mock;
 
 import org.bryan.schorn.tha.matching.model.Order;
-import org.bryan.schorn.tha.matching.order.OrderParser;
+import org.bryan.schorn.tha.matching.model.OrderType;
+import org.bryan.schorn.tha.matching.model.Side;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
+import java.time.Instant;
+import java.time.format.DateTimeParseException;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 
 /**
  * Order Parser Implementation for a line in CSV format
  */
-public class MockOrderFeedParser implements OrderParser {
+public class MockOrderFeedParser implements MockOrderFeed.MockOrderParser {
     static private final Logger LGR = LoggerFactory.getLogger(MockOrderFeedParser.class);
 
-    static public final String HEADER = "send_time,sender_id,target_id,cl_ord_id,symbol,side,order_type,price,order_qty";
-    static final Map<String,Integer> FIELD_MAP = new HashMap<>();
-    static {
-        String[] fields = HEADER.split(",");
+    private String header = null;
+    private Map<String,Integer> fieldMap;
+
+    public void setHeader(String header) {
+        this.header = header;
+        this.fieldMap = new HashMap<>();
+        String[] fields = this.header.split(",");
         for (int i = 0; i < fields.length; i++) {
-            FIELD_MAP.put(fields[i],i);
+            fieldMap.put(fields[i],i);
         }
     }
-
-    private List<OrderParseException> exceptions = new ArrayList<>();
-
     /**
      * Parser and convert a String in CSV format representing a single order.
      *
@@ -60,43 +62,28 @@ public class MockOrderFeedParser implements OrderParser {
      */
     @Override
     public Order apply(String line) {
+        String[] values = line.split(",");
+        Instant timestamp = null;
         try {
-            String[] values = line.split(",");
-            if (values.length != FIELD_MAP.size()) {
-                throw new Exception(String.format("Found %d fields was expecting %d fields", values.length, FIELD_MAP.size()));
-            }
-            Order.Builder builder = Order.builder();
-            builder.setSendTime(values[FIELD_MAP.get("send_time")]);
-            builder.setSenderId(values[FIELD_MAP.get("sender_id")]);
-            builder.setTargetId(values[FIELD_MAP.get("target_id")]);
-            builder.setClOrdId(values[FIELD_MAP.get("cl_ord_id")]);
-            builder.setSymbol(values[FIELD_MAP.get("symbol")]);
-            builder.setSide(values[FIELD_MAP.get("side")]);
-            builder.setOrderType(values[FIELD_MAP.get("order_type")]);
-            builder.setPrice(values[FIELD_MAP.get("price")]);
-            builder.setOrderQty(values[FIELD_MAP.get("order_qty")]);
-            return builder.build();
-        } catch (Exception ex) {
-            this.exceptions.add(new OrderParseException(ex, line));
+            timestamp = parseEpochNanoTimestamp.apply(values[fieldMap.get("timestamp")]);
+        } catch (DateTimeParseException ex) {
+            LGR.error("Failed to parse timestamp.");
         }
-        return null;
+        return Order.create(timestamp,
+            values[fieldMap.get("symbol")],
+            Side.parse(values[fieldMap.get("side")]),
+            OrderType.parse(values[fieldMap.get("type")]),
+            values[fieldMap.get("price")].length() > 0
+                ? Double.valueOf(values[fieldMap.get("price")])
+                : 0.0,
+            1);
     }
 
-    /**
-     * Were there any exceptions?
-     *
-     * @return
-     */
-    public boolean hasExceptions() {
-        return !this.exceptions.isEmpty();
-    }
-
-    /**
-     * List of all the exceptions (one for each line that had exception).
-     * @return
-     */
-    public List<OrderParseException> getExceptions() {
-        return this.exceptions;
-    }
-
+    static final Function<String, Instant> parseEpochNanoTimestamp = (timeStr) -> {
+        String[] timeParts = timeStr.split("\\.");
+        long epochSeconds = Long.valueOf(timeParts[0]).longValue();
+        //int nanoSeconds = Double.valueOf(1000000000.0 * Double.valueOf("0."+timeParts[1]).doubleValue()).intValue();
+        int nanoSeconds = Integer.valueOf(timeParts[1]).intValue();
+        return Instant.ofEpochSecond(epochSeconds, nanoSeconds);
+    };
 }

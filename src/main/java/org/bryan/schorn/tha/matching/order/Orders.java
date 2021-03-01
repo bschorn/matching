@@ -25,7 +25,10 @@
 
 package org.bryan.schorn.tha.matching.order;
 
+import org.bryan.schorn.tha.matching.engine.Engine;
 import org.bryan.schorn.tha.matching.model.Order;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -37,33 +40,30 @@ import java.util.function.Supplier;
  *
  */
 public class Orders {
-
+    static private final Logger LGR = LoggerFactory.getLogger(Orders.class);
     static final private Helper HELPER = new Helper();
 
     static public void setFeed(OrderFeed orderFeed) {
         HELPER.set(orderFeed);
     }
 
-    static public Supplier<Order> asSupplier() { return HELPER; }
+    static public Supplier<Order> getSupplier() { return HELPER; }
 
-    static public class Helper implements Supplier<Order> {
-        private final Queue<Order> queue = new ConcurrentLinkedQueue<>();
+    /**
+     * Internal Helper
+     */
+    static private class Helper implements Supplier<Order> {
+        private OrderFeed orderFeed = null;
         void set(OrderFeed orderFeed) {
-            Order order = orderFeed.get();
-            while (order != null) {
-                queue.add(order);
-                order = orderFeed.get();
-            }
+            this.orderFeed = orderFeed;
         }
         @Override
         public Order get() {
-            try {
-                Thread.sleep(200);
-            } catch (Exception ex) {
-
+            if (this.orderFeed == null) {
+                LGR.error("There was no OrderFeed instance provided to Orders.");
+                return null;
             }
-            return this.queue.poll();
-
+            return this.orderFeed.get();
         }
     }
 

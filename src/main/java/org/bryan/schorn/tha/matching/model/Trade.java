@@ -25,56 +25,73 @@
 
 package org.bryan.schorn.tha.matching.model;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
 /**
  * Trade Execution (Product, Qty, Price, Timestamp)
  */
-public class Trade {
+public interface Trade {
 
-    static public DateTimeFormatter TRADE_TIME_FORMAT = DateTimeFormatter.ISO_DATE_TIME;
+    Instant timestamp();
+    String symbol();
+    Double price();
+    Integer quantity();
 
-    private final Product product;
-    private final int quantity;
-    private final double tradePrice;
-    private final LocalDateTime timestamp;
-    private final Fill takeFill;
-    private final Fill provideFill;
-
-    public Trade(Product product, int quantity, double tradePrice, LocalDateTime timestamp, Order takeOrder, Order provideOrder) {
-        this.product = product;
-        this.quantity = quantity;
-        this.tradePrice = tradePrice;
-        this.timestamp = timestamp;
-        this.takeFill = new Fill.Buy(this, takeOrder);
-        this.provideFill = new Fill.Sell(this, provideOrder);
-    }
-
-    public String symbol() {
-        return this.product.symbol();
-    }
-    public int quantity() {
-        return this.quantity;
-    }
-    public double price() {
-        return this.tradePrice;
-    }
-    public LocalDateTime timestamp() {
-        return this.timestamp;
-    }
-
-    public Fill takeFill() {
-        return this.takeFill;
-    }
-    public Fill provideFill() {
-        return this.provideFill;
+    /**
+     * Create Trade
+     *
+     * @param product
+     * @param quantity
+     * @param tradePrice
+     * @param timestamp
+     * @return
+     */
+    static Trade create(String symbol, Integer quantity, Double tradePrice, Instant timestamp) {
+        return new Impl(symbol, quantity, tradePrice, timestamp);
     }
 
 
-    @Override
-    public String toString() {
-        return String.format("%s,%.2f,%s", product.symbol(), tradePrice, TRADE_TIME_FORMAT.format(timestamp));
-    }
+    /**
+     * Trade Implementation
+     */
+    class Impl implements Trade {
 
+        private final String symbol;
+        private final Integer quantity;
+        private final Double tradePrice;
+        private final Instant timestamp;
+
+        private Impl(String symbol, Integer quantity, Double tradePrice, Instant timestamp) {
+            this.symbol = symbol;
+            this.quantity = quantity;
+            this.tradePrice = tradePrice;
+            this.timestamp = timestamp;
+        }
+
+        public String symbol() { return this.symbol; }
+
+        public Integer quantity() {
+            return this.quantity;
+        }
+
+        public Double price() {
+            return this.tradePrice;
+        }
+
+        public Instant timestamp() {
+            return this.timestamp;
+        }
+
+
+        @Override
+        public String toString() {
+            return String.format("%s,%.2f,%d.%d",
+                    this.symbol,
+                    this.tradePrice,
+                    this.timestamp.getEpochSecond(),
+                    this.timestamp.getNano());
+        }
+    }
 }

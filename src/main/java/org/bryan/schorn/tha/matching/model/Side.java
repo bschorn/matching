@@ -25,11 +25,27 @@
 
 package org.bryan.schorn.tha.matching.model;
 
+
+/**
+ * Enumerated Side
+ */
 public enum Side {
     BUY,
-    SELL;
+    SELL,
+    UNKNOWN;
 
     public Side otherSide() {
         return this == Side.BUY ? Side.SELL : Side.BUY;
     }
+
+    static public Side parse(String text) {
+        if (text.toLowerCase().startsWith("b")) {
+            return Side.BUY;
+        }
+        if (text.toLowerCase().startsWith("s")) {
+            return Side.SELL;
+        }
+        return Side.UNKNOWN;
+    }
+
 }

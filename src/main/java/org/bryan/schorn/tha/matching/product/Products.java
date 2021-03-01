@@ -42,6 +42,10 @@ public class Products {
         HELPER.set(productFeed);
     }
 
+    static public boolean isHalted(String symbol) {
+        Product product = HELPER.products.get(symbol);
+        return product != null ? product.isHalted() : true;
+    }
     static public Product find(String symbol) {
         return HELPER.products.get(symbol);
     }

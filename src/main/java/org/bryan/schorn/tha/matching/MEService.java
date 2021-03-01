@@ -25,11 +25,12 @@
 
 package org.bryan.schorn.tha.matching;
 
-import org.bryan.schorn.tha.matching.engine.ActivityLogs;
-import org.bryan.schorn.tha.matching.engine.Engine;
-import org.bryan.schorn.tha.matching.engine.OrderThrottleRule;
-import org.bryan.schorn.tha.matching.engine.ProductHalted;
+import org.bryan.schorn.tha.matching.engine.*;
+import org.bryan.schorn.tha.matching.engine.rule.CheckRequiredFields;
+import org.bryan.schorn.tha.matching.engine.rule.OrderThrottleRule;
+import org.bryan.schorn.tha.matching.engine.rule.ProductHalted;
 import org.bryan.schorn.tha.matching.model.Order;
+import org.bryan.schorn.tha.matching.model.Trade;
 import org.bryan.schorn.tha.matching.order.OrderFeed;
 import org.bryan.schorn.tha.matching.product.ProductFeed;
 import org.bryan.schorn.tha.matching.order.Orders;
@@ -40,12 +41,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Properties;
+import java.util.concurrent.*;
 
 
 /**
  * Entry Point
  */
-public class MEService implements Runnable {
+public class MEService {
 
     static private final Logger LGR = LoggerFactory.getLogger(MEService.class);
 
@@ -58,8 +60,19 @@ public class MEService implements Runnable {
         STOP;
     }
     private State state = State.INIT;
+    private ExecutorService executorService = null;
+    // Orders
     private OrderFeed orderFeed = null;
+    private Future<Integer> futureOrderFeed = null;
+    // Engine
     private Engine engine = null;
+    private Future<Integer> futureEngine = null;
+    // Order Reject File
+    private ActivityLog<Order.Reject> activityLogOrderReject = null;
+    private Future<Integer> futureActivityLogOrderReject = null;
+    // Trade File
+    private ActivityLog<Trade> activityLogTrade = null;
+    private Future<Integer> futureActivityLogTrade = null;
 
     /**
      * Configuration Entry Point
@@ -80,45 +93,74 @@ public class MEService implements Runnable {
             LGR.error("Invalid State for calling init()");
             return;
         }
-        // get product feed created/connected/attached
-        ProductFeed productFeed = ProductFeed.create(properties);
+        /**
+         * There are four working threads.
+         * 1) OrderFeed
+         * 2) Engine (Matching)
+         * 3) Logging Trades
+         * 4) Logging Rejects
+         */
+        this.executorService = Executors.newFixedThreadPool(4);
+
+        /**
+         * Products are read/loaded completely on the main thread before
+         * any activity is started.
+         */
+        ProductFeed productFeed = ProductFeed.create(this.properties);
         productFeed.connect();
         Products.setFeed(productFeed);
 
-        // get order feed created/connected/attached
-        this.orderFeed = OrderFeed.create(properties);
+        /**
+         * Orders are streamed from a file and will be running
+         * in its own thread.
+         */
+        this.orderFeed = OrderFeed.create(this.properties);
         this.orderFeed.connect();
         Orders.setFeed(this.orderFeed);
 
+        /**
+         * Engine reads orders from a supplier in its own thread.
+         * Each new order is either rejected, matched or placed
+         * in the OrderBook.
+         */
         // create single engine with all products
         this.engine = new Engine(Products.findAll());
 
+        /**
+         * Engine rules can be custom built by deriving from the
+         * Engine.Rule interface and added to the Engine.
+         * The following rules are prebuilt and have static
+         * instances declared that can be readily used.
+         */
+        // add rule for enforcing required fields
+        this.engine.addRule(CheckRequiredFields.CHECK_REQUIRED_FIELDS);
         // add rule for trade halts
         this.engine.addRule(ProductHalted.PRODUCTED_HALTED);
         // add rule for the 3 orders in one second
         this.engine.addRule(OrderThrottleRule.MAX_THREE_PER_SECOND);
 
+        /**
+         * Activity Logs can be used to read from a supplier
+         * and write to a file. Since we can write Trades and
+         * Rejects as soon as they happen, we have these two
+         * pulling Trades and Rejects from the Engine as
+         * they are being created.
+         */
+        // create ActivityLog instance to log trades to file
+        this.activityLogTrade = new ActivityLog<>(
+                this.engine.getSupplier(Trade.class),
+                this.properties.getProperty("TradeFile"),
+                this.properties.getProperty("TradeFileHeader"));
+
+        // create ActivityLog instance to log order rejects to file
+        this.activityLogOrderReject = new ActivityLog<>(
+                this.engine.getSupplier(Order.Reject.class),
+                this.properties.getProperty("RejectedFile"),
+                this.properties.getProperty("RejectedFileHeader"));
+
+
         // update state
         this.state = State.START;
-    }
-
-    /**
-     * Service Thread
-     *
-     */
-    @Override
-    public void run() {
-        this.state = State.RUNNING;
-        this.engine.startLoop();
-        while (this.state == State.RUNNING) {
-            Order order = Orders.asSupplier().get();
-            if (order != null) {
-                this.engine.accept(order);
-            } else {
-                this.engine.stopLoop();
-                this.stop();
-            }
-        }
     }
 
     /**
@@ -126,13 +168,52 @@ public class MEService implements Runnable {
      *
      * @throws Exception
      */
-    public void start() throws Exception {
+    public void start() {
         if (this.state != State.START) {
             LGR.error("Invalid State for calling start()");
             return;
         }
-        this.run();
+        this.state = State.RUNNING;
+
+        /**
+         * Submit the working instances to the Executor Service
+         * to be run and keep a Future instance for later.
+         */
+        this.futureOrderFeed = executorService.submit(this.orderFeed);
+        this.futureEngine = executorService.submit(this.engine);
+        this.futureActivityLogTrade = executorService.submit(this.activityLogTrade);
+        this.futureActivityLogOrderReject = executorService.submit(this.activityLogOrderReject);
+
+        /**
+         * Loop, Check Status, Wait
+         */
+        Integer ordersReceived = null;
+        Integer ordersProcessed = null;
+        while (this.state == State.RUNNING) {
+            try {
+                if (ordersReceived == null && this.futureOrderFeed.isDone()) {
+                    ordersReceived = this.futureOrderFeed.get();
+                    // Since that's the end of the OrderFeed, we tell the Engine
+                    // to stop where there are no more Orders.
+                    this.engine.stop();
+                } else if (ordersProcessed == null && this.futureEngine.isDone()) {
+                    ordersProcessed = this.futureEngine.get();
+                    // the engine has completed, so let's start shutting down
+                    // this service
+                    this.stop();
+                } else {
+                    Thread.sleep(200);
+                }
+            } catch (InterruptedException ie) {
+                LGR.warn(ie.getMessage());
+            } catch (Exception ex) {
+                LGR.error(ToString.stackTrace(ex));
+            }
+        }
+        LGR.info("{} orders received", ordersReceived);
+        LGR.info("{} orders processed", ordersProcessed);
     }
+
 
     /**
      * Stop Service
@@ -142,31 +223,33 @@ public class MEService implements Runnable {
             LGR.error("Invalid State for calling stop()");
             return;
         }
+        /**
+         * The Activity Logs (Trades,Rejects) don't know when to quit
+         * so they have to be told.
+         */
+        this.activityLogOrderReject.stop();
+        this.activityLogTrade.stop();
         this.state = State.STOP;
     }
 
     public void close() {
         try {
-            ActivityLogs.logTrades(this.engine.trades(),
-                    this.properties.getProperty("Trade.File"),
-                    this.properties.getProperty("Trade.File.Header"));
+            /**
+             * Once everything has completed we can capture the OrderBooks' state.
+             */
+            LGR.info("Writing order books...");
+            ActivityLog<OrderBook.PriceLevel> activityLogPriceLevel = new ActivityLog<>(
+                    this.engine.getSupplier(OrderBook.PriceLevel.class),
+                    this.properties.getProperty("OrderBookFile"),
+                    this.properties.getProperty("OrderBookFileHeader"));
+            activityLogPriceLevel.stop();
+            Integer count = activityLogPriceLevel.call();
+            LGR.info("{} price levels written", count);
+
         } catch (Exception ex) {
             LGR.error(ToString.stackTrace(ex));
         }
-        try {
-            ActivityLogs.logRejects(this.engine.rejected(),
-                    this.properties.getProperty("Rejected.File"),
-                    this.properties.getProperty("Rejected.File.Header"));
-        } catch (Exception ex) {
-            LGR.error(ToString.stackTrace(ex));
-        }
-        try {
-            ActivityLogs.logOrderBook(this.engine.getOrderBooks(),
-                    this.properties.getProperty("OrderBook.File"),
-                    this.properties.getProperty("OrderBook.File.Header"));
-        } catch (Exception ex) {
-            LGR.error(ToString.stackTrace(ex));
-        }
+        LGR.info("exiting");
     }
 
     public static void main(String[] args) {

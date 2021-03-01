@@ -65,10 +65,9 @@ public class MockProductFeedParser implements ProductParser {
             if (values.length != 2 && values.length != FIELD_MAP.size()) {
                 throw new Exception(String.format("Found %d fields was expecting %d fields", values.length, FIELD_MAP.size()));
             }
-            Product.Builder builder = new Product.Builder();
-            builder.setSymbol(values[FIELD_MAP.get("symbol")]);
-            builder.setHalted(values[FIELD_MAP.get("is_halted")]);
-            return builder.build();
+            Product product = Product.create(values[FIELD_MAP.get("symbol")]);
+            product.setHalted(Boolean.valueOf(values[FIELD_MAP.get("is_halted")]));
+            return product;
         } catch (Exception ex) {
             this.exceptions.add(new ProductParseException(ex, line));
         }

@@ -26,5 +26,15 @@
 package org.bryan.schorn.tha.matching.model;
 
 public enum OrderType {
-    MARKET, LIMIT;
+    MARKET, LIMIT, UNKNOWN;
+
+    static public OrderType parse(String text) {
+        if (text.toLowerCase().startsWith("ma") || text.toLowerCase().startsWith("mk")) {
+            return OrderType.MARKET;
+        }
+        if (text.toLowerCase().startsWith("li") || text.toLowerCase().startsWith("lm")) {
+            return OrderType.LIMIT;
+        }
+        return OrderType.UNKNOWN;
+    }
 }

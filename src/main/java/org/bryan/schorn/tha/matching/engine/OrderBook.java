@@ -29,6 +29,8 @@ import org.bryan.schorn.tha.matching.model.Order;
 import org.bryan.schorn.tha.matching.model.Product;
 import org.bryan.schorn.tha.matching.model.Side;
 
+import java.io.IOException;
+import java.io.Writer;
 import java.util.*;
 import java.util.function.Consumer;
 
@@ -44,6 +46,8 @@ import java.util.function.Consumer;
  * A true OrderBook structure is beyond the scope of a 3-hour project.
  */
 public class OrderBook {
+
+    static private final String SNAPSHOT_DELIM = ",";
 
     private final Product product;
 
@@ -70,6 +74,7 @@ public class OrderBook {
      * ** So there can only be ONE thread per OrderBook (and Product) **
      */
     private final List<Order> takeList = new ArrayList<>();
+
 
     /**
      * Order Books are maintained by Product
@@ -150,10 +155,10 @@ public class OrderBook {
             Queue<Order> q = this.sells.get(price);
             while (takeQty > 0 && !q.isEmpty()) {
                 Order order = q.peek();
-                if (takeQty >= order.unfilledQty()) {
+                if (takeQty >= order.orderQty()) {
                     q.remove();
                 }
-                takeQty -= Math.min(takeQty, order.unfilledQty());
+                takeQty -= Math.min(takeQty, order.orderQty());
                 takeList.add(order);
             }
             if (takeQty == 0) {
@@ -179,10 +184,10 @@ public class OrderBook {
             Queue<Order> q = this.buys.get(price);
             while (takeQty > 0 && !q.isEmpty()) {
                 Order order = q.peek();
-                if (takeQty >= order.unfilledQty()) {
+                if (takeQty >= order.orderQty()) {
                     q.remove();
                 }
-                takeQty -= Math.min(takeQty, order.unfilledQty());
+                takeQty -= Math.min(takeQty, order.orderQty());
                 takeList.add(order);
             }
             if (takeQty == 0) {
@@ -192,15 +197,8 @@ public class OrderBook {
         return takeList;
     }
 
-    /**
-     * Dumps the OrderBook
-     *
-     * TODO: needs to be tested.
-     *
-     * @return
-     */
-    @Override
-    public String toString() {
+    public void writeSnapshot(Writer writer, String header) throws IOException {
+        String[] fields = header.split(",");
         int sellSize = this.sells.keySet().size();
         Double[] sellPrices = new Double[sellSize];
         for (Double price : this.sells.keySet()) {
@@ -208,23 +206,98 @@ public class OrderBook {
         }
         StringJoiner joiner = new StringJoiner(System.lineSeparator(),"","");
         for (Double price : sellPrices) {
-            int qty = this.sells.get(price).stream().map(o -> o.unfilledQty()).reduce(0, Integer::sum);
-            if (qty > 0)
-                joiner.add(String.format("%s,%.2f,%d,%d", this.product.symbol(), price, 0, qty));
+            int sellQty = this.sells.get(price).stream().map(o -> o.orderQty()).reduce(0, Integer::sum);
+            if (sellQty > 0) {
+                for (int i = 0; i < fields.length; i++) {
+                    if (i > 0) writer.write(SNAPSHOT_DELIM);
+                    switch (fields[i]) {
+                        case "symbol":
+                            writer.write(this.product.symbol());
+                            break;
+                        case "price":
+                            writer.write(String.format("%.2f", price));
+                            break;
+                        case "sells":
+                            writer.write(String.format("%d", sellQty));
+                            break;
+                    }
+                }
+            }
+
         }
         for (Double price : this.buys.keySet()) {
-            int qty = this.buys.get(price).stream().map(o -> o.unfilledQty()).reduce(0, Integer::sum);
-            if (qty > 0)
-                joiner.add(String.format("%s,%.2f,%d,%d", this.product.symbol(), price, qty, 0));
+            int buyQty = this.buys.get(price).stream().map(o -> o.orderQty()).reduce(0, Integer::sum);
+            if (buyQty > 0) {
+                for (int i = 0; i < fields.length; i++) {
+                    if (i > 0) writer.write(SNAPSHOT_DELIM);
+                    switch (fields[i]) {
+                        case "symbol":
+                            writer.write(this.product.symbol());
+                            break;
+                        case "price":
+                            writer.write(String.format("%.2f", price));
+                            break;
+                        case "buys":
+                            writer.write(String.format("%d", buyQty));
+                            break;
+                    }
+                }
+            }
         }
-        joiner.add("");
-        return joiner.toString();
+    }
+
+
+    /**
+     * Structure for representing a summary of buys/sells for a price
+     */
+    static public class PriceLevel {
+        String symbol;
+        double price;
+        int buys;
+        int sells;
+        PriceLevel(String symbol, double price, int buys, int sells) {
+            this.symbol = symbol;
+            this.price = price;
+            this.buys = buys;
+            this.sells = sells;
+        }
+        @Override
+        public String toString() {
+            return String.format("%s,%.2f,%d,%d", this.symbol, this.price, this.buys, this.sells);
+        }
+    }
+
+    /**
+     * Summarizes Order Book by Price Levels (for writing to a file)
+     *
+     * @return
+     */
+    List<PriceLevel> getPriceLevels() {
+        List<PriceLevel> list = new ArrayList<>();
+        int sellSize = this.sells.keySet().size();
+        Double[] sellPrices = new Double[sellSize];
+        for (Double price : this.sells.keySet()) {
+            sellPrices[--sellSize] = price;
+        }
+        for (Double price : sellPrices) {
+            int qty = this.sells.get(price).stream().map(o -> o.orderQty()).reduce(0, Integer::sum);
+            if (qty > 0) {
+                list.add(new PriceLevel(this.product.symbol(), price, 0, qty));
+            }
+        }
+        for (Double price : this.buys.keySet()) {
+            int qty = this.buys.get(price).stream().map(o -> o.orderQty()).reduce(0, Integer::sum);
+            if (qty > 0) {
+                list.add(new PriceLevel(this.product.symbol(), price, qty, 0));
+            }
+        }
+        return list;
     }
 
     /**
      * Cleans out the OrderBook
      */
-    public void recycle() {
+    void recycle() {
         this.buys.clear();
         this.sells.clear();
     }

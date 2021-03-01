@@ -25,13 +25,7 @@
 
 package org.bryan.schorn.tha.matching.model;
 
-import org.bryan.schorn.tha.matching.model.impl.OrderImpl;
-import org.bryan.schorn.tha.matching.product.Products;
-
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.List;
+import java.time.Instant;
 import java.util.StringJoiner;
 
 
@@ -39,89 +33,102 @@ import java.util.StringJoiner;
  *
  */
 public interface Order {
-
-    Product product();
-    int orderQty();
-    int unfilledQty();
-    void fill(Fill fill);
-    Side side();
-    double price();
+    Instant timestamp();
+    String symbol();
     OrderType orderType();
+    Side side();
+    Double price();
+    Integer orderQty();
 
 
-    /**
-     * Field Exception during build
-     */
-    static public class FieldException extends Exception {
-        Exception exception;
-        String fieldName;
-        String fieldValue;
+    static Order create(Instant timestamp,
+                        String symbol,
+                        Side side,
+                        OrderType orderType,
+                        Double price,
+                        Integer orderQty) {
+        return new Impl(timestamp, symbol, side, orderType, price, orderQty);
+    }
 
-        public FieldException(String fieldName, String fieldValue, Exception exception) {
-            super(exception);
-            this.fieldName = fieldName;
-            this.fieldValue = fieldValue;
-            this.exception = exception;
+    class Impl implements Order {
+        private final Instant timestamp;
+        private final String symbol;
+        private final Side side;
+        private final OrderType orderType;
+        private final Double price;
+        private final Integer orderQty;
+
+        private Impl(Instant timestamp,
+                         String symbol,
+                         Side side,
+                         OrderType orderType,
+                         Double price,
+                         Integer orderQty) {
+            this.timestamp = timestamp;
+            this.symbol = symbol;
+            this.side = side;
+            this.orderType = orderType;
+            this.price = price;
+            this.orderQty = orderQty;
+        }
+
+        public Instant timestamp() { return this.timestamp; }
+        public String symbol() {
+            return this.symbol;
+        }
+        public Integer orderQty() {
+            return this.orderQty;
+        }
+        public Side side() {
+            return this.side;
+        }
+        public Double price() {
+            return this.price;
+        }
+        public OrderType orderType() {
+            return this.orderType;
         }
 
         @Override
-        public String getMessage() {
-            return String.format("%s: %s caught exception: %s", fieldName, fieldValue, exception.getMessage());
+        public String toString() {
+            StringJoiner joiner = new StringJoiner("\n","","");
+            //symbol,side,type,price,timestamp
+            joiner.add(String.format("%s,%s,%s,%.2f,%d.%d",
+                    this.symbol,
+                    this.side.name(),
+                    this.orderType.name(),
+                    this.price,
+                    this.timestamp.getEpochSecond(),
+                    this.timestamp.getNano()));
+            return joiner.toString();
+        }
+
+    }
+
+    static Reject reject(Order order, String reason) {
+        return new Reject(order, reason);
+    }
+    /**
+     * Reject Order
+     */
+    class Reject {
+
+        private final Order order;
+        private final String reason;
+
+        private Reject(Order order, String reason) {
+            this.order = order;
+            this.reason = reason;
+        }
+        public Order order() { return this.order; }
+
+        public String reason() { return this.reason; }
+
+        @Override
+        public String toString() {
+            return String.format("%s,%s", this.order.toString(), this.reason());
         }
     }
 
-
-    /**
-     * Order Builder Interface
-     */
-    interface Builder {
-        Builder setSendTime(String sendTime);
-        Builder setSendTime(LocalDateTime sendTime);
-        Builder setSenderId(String senderId);
-        Builder setTargetId(String targetId);
-        Builder setClOrdId(String clOrdId);
-        Builder setSymbol(String symbol);
-        Builder setProduct(Product product);
-        Builder setSide(String side);
-        Builder setSide(Side side);
-        Builder setOrderType(String orderType);
-        Builder setOrderType(OrderType orderType);
-        Builder setPrice(String price);
-        Builder setPrice(double price);
-        Builder setOrderQty(String orderQty);
-        Builder setOrderQty(int orderQty);
-
-        Order build() throws Exception;
-
-        boolean hasExceptions();
-        List<Exception> getExceptions();
-    }
-
-    /**
-     * Creates an Order.Builder for creating Order instances
-     * @return
-     */
-    static Order.Builder builder() {
-        return new OrderImpl.BuilderImpl();
-    }
-
-    /**
-     * Rejected Order (original order wrapped with reason included)
-     */
-    interface Rejected extends Order {
-        String reason();
-        Order order();
-    }
-
-    /**
-     * Creates an Order.Rejected by containing an Order that has been
-     * rejected along with a reason.
-     *
-     * @param order
-     * @param reason
-     * @return
-     */
-    static Order.Rejected reject(Order order, String reason) {
-        return new OrderImpl.RejectedImpl(order, reason);
-    }
 }
+

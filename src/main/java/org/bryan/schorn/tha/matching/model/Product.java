@@ -25,67 +25,51 @@
 
 package org.bryan.schorn.tha.matching.model;
 
-import java.util.ArrayList;
-import java.util.List;
-
 /**
  * Product
  */
-public class Product {
+public interface Product {
 
-    private final String symbol;
-    private boolean isHalted;
-
-    private Product(Builder builder) {
-        this.symbol = builder.symbol;
-        this.isHalted = builder.isHalted;
-    }
+    String symbol();
+    Boolean isHalted();
+    void setHalted(Boolean halted);
 
     /**
-     * Product's exchange recognized symbol
      *
+     * @param symbol
      * @return
      */
-    public String symbol() {
-        return this.symbol;
+    static Product create(String symbol) {
+        return new Impl(symbol);
     }
 
     /**
-     * Product's current trading status.
-     *
-     * @return
+     * Product Implementation
      */
-    public boolean isHalted() {
-        return this.isHalted;
-    }
+    class Impl implements Product {
+        private final String symbol;
+        private Boolean isHalted;
 
-
-    /**
-     * Product Builder
-     */
-    static public class Builder {
-        String symbol;
-        boolean isHalted;
-        List<Exception> exceptions = new ArrayList<>();
-
-        public Builder setSymbol(String symbol) {
+        private Impl(String symbol) {
             this.symbol = symbol;
-            return this;
+            this.isHalted = true;
         }
-        public Builder setHalted(String isHalted) {
-            this.isHalted = Boolean.valueOf(isHalted);
-            return this;
+
+        public String symbol() {
+            return this.symbol;
         }
-        public Builder setHalted(boolean isHalted) {
-            this.isHalted = isHalted;
-            return this;
+
+        public Boolean isHalted() {
+            return this.isHalted;
         }
-        public Product build() throws Exception {
-            if (this.exceptions.isEmpty()) {
-                return new Product(this);
-            }
-            throw new Exception(String.format("Order build failed with %d exceptions.",
-                    this.exceptions.size()));
+
+        public void setHalted(Boolean halted)  {
+            this.isHalted = halted;
+        }
+
+        @Override
+        public String toString() {
+            return String.format("%s,%s",this.symbol,this.isHalted.toString());
         }
     }
 }
